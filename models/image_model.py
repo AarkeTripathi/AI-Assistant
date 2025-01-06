@@ -2,8 +2,6 @@ from groq import Groq
 import os
 import base64
 from dotenv import load_dotenv
-# from langchain_core.output_parsers import StrOutputParser
-# from langchain_core.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, AIMessagePromptTemplate, ChatPromptTemplate
 
 def load_client():
     load_dotenv()
@@ -39,9 +37,3 @@ def chat(image_path,text):
     )
     response = (chat_completion.choices[0].message.content)
     return response
-
-
-# # Path to your image
-# image_path = "Penguins.jpg"
-# text="Whats in this image?"
-# print(response(image_path,text))

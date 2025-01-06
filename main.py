@@ -7,10 +7,6 @@ import uvicorn
 
 app=FastAPI()
 
-# text=input()
-# doc='Final_Year_Project_Paper_conference.docx'
-# img='ID_Card_Front.jpg'
-
 # @app.get('/')
 # def initiate():
 ai_theme="You are a helpful AI assistant."
@@ -29,17 +25,14 @@ async def document_processing(text: str = Form(...), file: UploadFile = File(...
     else:
         temp_document_path = f"temp_{file.filename}"
         try:
-            # Save the uploaded file temporarily
             with open(temp_document_path, "wb") as temp_file:
                 temp_file.write(await file.read())
             context=load_document(temp_document_path)
             if text=='':
                 text='What is in this document?'
             prompt=context+' '+text
-            # response=base_model.chat(chat_history,prompt)
             response=base_model.chat(chat_history,prompt)
         finally:
-            # Delete the temporary file
             if os.path.exists(temp_document_path):
                 os.remove(temp_document_path)
         return {'User':text,'Assistant':response}
@@ -51,7 +44,6 @@ async def image_processing(text: str = Form(...), file: UploadFile = File(...)):
     else:
         temp_image_path = f"temp_{file.filename}"
         try:
-            # Save the uploaded file temporarily
             with open(temp_image_path, "wb") as temp_file:
                 temp_file.write(await file.read())
             if text=='':
@@ -62,7 +54,6 @@ async def image_processing(text: str = Form(...), file: UploadFile = File(...)):
             AIresponse=AIMessagePromptTemplate.from_template(response)
             chat_history.append(AIresponse)
         finally:
-            # Delete the temporary file
             if os.path.exists(temp_image_path):
                 os.remove(temp_image_path)
         return {'User':text,'Assistant':response}
