@@ -11,7 +11,6 @@ def load_document(document):
                                 chunking_strategy="basic",
                                 max_characters=1000000,
                                 include_orig_elements=False,)
-    # loader = UnstructuredLoader([document],  post_processors=[clean_extra_whitespace, remove_punctuation])
     docs = loader.load()
     for doc in docs:
         text=text+doc.page_content
