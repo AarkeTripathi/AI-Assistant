@@ -39,7 +39,7 @@ async def document_processing(text: Optional[str] = Form(None), file: UploadFile
         return {'User':text,'Assistant':response}
 
 @app.post('/image/')
-async def image_processing(text: str = Form(...), file: UploadFile = File(...)):
+async def image_processing(text: Optional[str] = Form(None), file: UploadFile = File(...)):
     if not (file.content_type.startswith("image/")):
         raise HTTPException(status_code=422, detail="Invalid File type.")
     else:
