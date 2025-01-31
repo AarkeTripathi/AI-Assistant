@@ -9,7 +9,7 @@ def load_model():
     load_dotenv()
     api_key=os.getenv('GROQ_API_KEY')
     # os.environ["GROQ_API_KEY"]=api_key
-    model = ChatGroq(api_key=api_key, model="llama-3.2-11b-vision-preview")
+    model = ChatGroq(api_key=api_key, model="llama-3.3-70b-versatile")
     return model
 
 def create_chat_history(ai_theme):

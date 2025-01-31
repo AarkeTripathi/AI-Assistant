@@ -4,6 +4,7 @@ from document_loader import load_document
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 import uvicorn
+from typing import Optional
 
 app=FastAPI()
 
@@ -19,7 +20,7 @@ async def text_processing(text):
     return {'User':text,'Assistant':response}
 
 @app.post('/document/')
-async def document_processing(text: str = Form(...), file: UploadFile = File(...)):
+async def document_processing(text: Optional[str] = Form(None), file: UploadFile = File(...)):
     if not (file.filename.endswith(".pdf") or file.filename.endswith(".docx") or file.filename.endswith(".pptx")):
         raise HTTPException(status_code=422, detail="Invalid File type.")
     else:
