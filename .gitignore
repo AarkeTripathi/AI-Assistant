@@ -1,5 +1,5 @@
 .env
 tester_nb.ipynb
 documents/
-__pycache__
-models/__pycache__
+__pycache__/
+models/__pycache__/
