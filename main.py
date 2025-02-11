@@ -1,5 +1,5 @@
 import os
-from models import base_model,image_model
+from models import base_model, image_model
 from document_loader import load_document
 import database as db
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
@@ -11,8 +11,6 @@ app=FastAPI()
 
 conn=db.engine.connect()
 
-# return chat_history
-
 USER_ID=1   # For now, we are assuming that the user is the admin
 SESSION_ID=1    # For now, we are assuming that the session is the first session
 
@@ -20,14 +18,14 @@ role1=db.role1
 role2=db.role2
 
 if not db.select_user('admin', conn):
-    db.insert_user(1, 'admin', 'admin', conn)
+    db.insert_user(USER_ID, 'admin', 'admin', conn)
     print('here')   
 
 def load_chat_history():
     ai_theme="You are a helpful AI assistant."
     chat_history=base_model.create_chat_history(ai_theme)
 
-    chats=db.select_chats(1, conn)
+    chats=db.select_chats(SESSION_ID, conn)
     if chats:
         for chat in chats:
             user_msg=chat[role1]
@@ -39,15 +37,17 @@ def load_chat_history():
 
 chat_history = load_chat_history()
 
-@app.get('/{text}')
+
+@app.get('/{text}/')
 async def text_processing(text: str):
     try:
         response=base_model.chat(chat_history,text)
         new_chat = {role1:text, role2:response}
-        db.update_chat(1, new_chat, 1, conn)
+        db.update_chat(SESSION_ID, new_chat, USER_ID, conn)
     except Exception as e:
         return {'Error':str(e)}
     return new_chat
+
 
 @app.post('/document/')
 async def document_processing(text: Optional[str] = Form(None), file: UploadFile = File(...)):
@@ -64,13 +64,14 @@ async def document_processing(text: Optional[str] = Form(None), file: UploadFile
             prompt=context+' '+text
             response=base_model.chat(chat_history,prompt)
             new_chat = {role1:prompt, role2:response}
-            db.update_chat(1, new_chat, 1, conn)
+            db.update_chat(SESSION_ID, new_chat, USER_ID, conn)
         except Exception as e:
             return {'Error':str(e)}
         finally:
             if os.path.exists(temp_document_path):
                 os.remove(temp_document_path)
         return new_chat
+
 
 @app.post('/image/')
 async def image_processing(text: Optional[str] = Form(None), file: UploadFile = File(...)):
@@ -89,13 +90,14 @@ async def image_processing(text: Optional[str] = Form(None), file: UploadFile = 
             AIresponse=AIMessagePromptTemplate.from_template(response)
             chat_history.append(AIresponse)
             new_chat = {role1:text, role2:response}
-            db.update_chat(1, new_chat, 1, conn)
+            db.update_chat(SESSION_ID, new_chat, USER_ID, conn)
         except Exception as e:
             return {'Error':str(e)}
         finally:
             if os.path.exists(temp_image_path):
                 os.remove(temp_image_path)
         return new_chat
+
 
 if __name__=="__main__":
    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
