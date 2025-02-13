@@ -2,10 +2,9 @@ import os
 from models import base_model, image_model
 from document_loader import load_document
 from database import Database
-from auth_service import Token, authenticate_user, create_access_token, get_password_hash
+from auth_service import User, Token, get_user, authenticate_user, create_access_token, get_password_hash, current_user
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
 from typing import Optional
-from datetime import timedelta
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 import uvicorn
@@ -51,9 +50,11 @@ async def register_user(username: str, email: str, password: str):
     db.insert_user(USER_ID, username, email, hashed_password)
     return {"message": "User created successfully."}
 
-# @app.get("/users/me", response_model=User)
-# async def read_users_me(current_user: User = Depends(get_current_active_user)):
-#     return current_user
+@app.get("/users/me", response_model=User)
+async def read_users_me(current_user: User = Depends(current_user)):
+    token_data = current_user
+    user = get_user(db, token_data.email)
+    return user
 
 
 '''Chat Routes'''

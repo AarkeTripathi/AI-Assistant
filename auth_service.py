@@ -33,9 +33,9 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):    
-    return pwd_context.hash(password)
+    return pwd_context.hash(password)  
 
-def get_user(db, email):
+def get_user(db, email: str):
     user = db.select_user(email)
     if not user:
         return False
@@ -71,10 +71,11 @@ async def current_user(token = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
         token_data = TokenData(email=email)
     except PyJWTError:
         raise credentials_exception
-    user = get_user(token_data.email)
-    if not user:
-        raise credentials_exception
-    return user
+    return token_data
+    # user = get_user(db, token_data.email)
+    # if not user:
+    #     raise credentials_exception
+    # return user
 
 async def get_current_active_user(current_user: User = Depends(current_user)):
     if current_user.disabled:
