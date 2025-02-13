@@ -17,6 +17,17 @@ def create_chat_history(ai_theme):
     chat_history=[system_message]
     return chat_history
 
+def load_chat_history(chats, role1, role2):
+    ai_theme="You are a helpful AI assistant."
+    chat_history=create_chat_history(ai_theme)
+    if chats:
+        for chat in chats:
+            user_msg=chat[role1]
+            ai_msg=chat[role2]
+            chat_history.append(HumanMessagePromptTemplate.from_template(user_msg))
+            chat_history.append(AIMessagePromptTemplate.from_template(ai_msg))
+    return chat_history
+
 def generate_response(chat_history):
     model=load_model()
     chat_template=ChatPromptTemplate.from_messages(chat_history)
