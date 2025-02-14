@@ -1,9 +1,9 @@
 import os
-import uuid
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy import MetaData, Table, Column, ForeignKey, Integer, String, JSON, func
 from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 class Database:
     def __init__(self):
@@ -52,17 +52,6 @@ class Database:
             return 1
         new_session_id = last_session_id + 1
         return new_session_id
-    
-
-    # def generate_chat_id(self):
-    #     conn = self.conn
-    #     trans = conn.begin()
-    #     max_chat_id = conn.execute(func.max(self.chats_table.c.id)).scalar()
-    #     trans.commit()
-    #     if not max_chat_id:
-    #         return 1
-    #     new_chat_id = max_chat_id + 1
-    #     return new_chat_id
 
 
     def select_user(self, email):
