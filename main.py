@@ -47,8 +47,11 @@ async def register_user(username: str, email: str, password: str):
     if db.select_user(email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists.")
     hashed_password = get_password_hash(password)
-    db.insert_user(USER_ID, username, email, hashed_password)
+    db.insert_user(username, email, hashed_password)
     return {"message": "User created successfully."}
+
+
+'''Authorized Routes'''
 
 @app.get("/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(current_user)):
@@ -64,7 +67,7 @@ async def text_processing(text: str):
     try:
         response=base_model.chat(chat_history,text)
         new_chat = {ROLE1:text, ROLE2:response}
-        db.update_chat(SESSION_ID, new_chat, USER_ID)
+        db.insert_chat(new_chat, SESSION_ID, USER_ID)
     except Exception as e:
         return {'Error':str(e)}
     return new_chat
@@ -84,7 +87,7 @@ async def document_processing(text: Optional[str] = Form(None), file: UploadFile
             prompt=context+' '+text
             response=base_model.chat(chat_history,prompt)
             new_chat = {ROLE1:prompt, ROLE2:response}
-            db.update_chat(SESSION_ID, new_chat, USER_ID)
+            db.insert_chat(new_chat, SESSION_ID, USER_ID)
         except Exception as e:
             return {'Error':str(e)}
         finally:
@@ -109,7 +112,7 @@ async def image_processing(text: Optional[str] = Form(None), file: UploadFile = 
             AIresponse=AIMessagePromptTemplate.from_template(response)
             chat_history.append(AIresponse)
             new_chat = {ROLE1:text, ROLE2:response}
-            db.update_chat(SESSION_ID, new_chat, USER_ID)
+            db.update_chat(new_chat, SESSION_ID, USER_ID)
         except Exception as e:
             return {'Error':str(e)}
         finally:

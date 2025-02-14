@@ -1,8 +1,9 @@
 import os
+import uuid
 from dotenv import load_dotenv
-from ast import literal_eval
 from sqlalchemy import create_engine
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Integer, String, JSON, PrimaryKeyConstraint
+from sqlalchemy import MetaData, Table, Column, ForeignKey, Integer, String, JSON, func
+from sqlalchemy.dialects.postgresql import UUID
 
 class Database:
     def __init__(self):
@@ -17,16 +18,16 @@ class Database:
             'users', self.metadata,
             Column('id', Integer, primary_key=True),
             Column('username', String, nullable=False),
-            Column('email', String, unique=True),
+            Column('email', String, unique=True, nullable=False),
             Column('hashed_password', String, nullable=False)
         )
 
         self.chats_table = Table(
             'chats', self.metadata,
+            Column('id', UUID(as_uuid=True), primary_key=True),
+            Column('conversation', JSON),
             Column('session_id', Integer, nullable=False),
-            Column('conversation', JSON, nullable=False),
-            Column('user_id', Integer, ForeignKey('users.id'), nullable=False),
-            PrimaryKeyConstraint('session_id', 'user_id', name='chats_id_seq')
+            Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
         )
 
 
@@ -34,20 +35,50 @@ class Database:
         self.metadata.create_all(self.engine)
 
 
+    def generate_user_id(self, conn):  
+        last_user_id = conn.execute(func.max(self.users_table.c.id)).scalar()
+        if not last_user_id:
+            return 1
+        new_user_id = last_user_id + 1
+        return new_user_id
+    
+
+    def generate_session_id(self):
+        conn = self.conn
+        trans = conn.begin()
+        last_session_id = conn.execute(func.max(self.chats_table.c.session_id)).scalar()
+        trans.commit()
+        if not last_session_id:
+            return 1
+        new_session_id = last_session_id + 1
+        return new_session_id
+    
+
+    # def generate_chat_id(self):
+    #     conn = self.conn
+    #     trans = conn.begin()
+    #     max_chat_id = conn.execute(func.max(self.chats_table.c.id)).scalar()
+    #     trans.commit()
+    #     if not max_chat_id:
+    #         return 1
+    #     new_chat_id = max_chat_id + 1
+    #     return new_chat_id
+
+
     def select_user(self, email):
         conn = self.conn
         trans = conn.begin()
         query = self.users_table.select().where(self.users_table.c.email == email)
-        result = conn.execute(query)
+        result = self.conn.execute(query)
         trans.commit()
         return result.fetchone()
 
 
-    def insert_user(self, id, name, email, hashed_pwd):
+    def insert_user(self, name, email, hashed_pwd):
         conn = self.conn
         trans = conn.begin()
         try:
-            query = self.users_table.insert().values(id=id, username=name, email=email, hashed_password=hashed_pwd)
+            query = self.users_table.insert().values(id=self.generate_user_id(conn), username=name, email=email, hashed_password=hashed_pwd)
             conn.execute(query)
             trans.commit()
         except Exception as e:
@@ -58,29 +89,27 @@ class Database:
     def select_chats(self, session_id):
         conn = self.conn
         trans = conn.begin()
-        query = self.chats_table.select().where(self.chats_table.c.session_id == session_id)
-        result = conn.execute(query)
-        trans.commit()
-        rows = result.fetchall()
-        conversation_list=[]
-        if not rows:
+        try:
+            query = self.chats_table.select().where(self.chats_table.c.session_id == session_id)
+            result = conn.execute(query)
+            trans.commit()
+            rows = result.fetchall()
+            conversation_list=[]
+            if not rows:
+                return conversation_list
+            for row in rows:
+                conversation_list.append(row[1])
             return conversation_list
-        for row in rows:
-            actual_list = literal_eval(row[1])
-            conversation_list = conversation_list + actual_list
-        return conversation_list
+        except Exception as e:
+            trans.rollback()
+            print(f"Transaction failed: {e}")
 
 
-    def update_chat(self, session_id, new_conversation, user_id):
-        chats = self.select_chats(session_id)
-        chats.append(new_conversation)
+    def insert_chat(self, new_conversation, session_id, user_id):
         conn = self.conn
         trans = conn.begin()
         try:
-            if len(chats)==1:
-                query = self.chats_table.insert().values(session_id=session_id, conversation=chats, user_id=user_id)
-            else:
-                query = self.chats_table.update().where(self.chats_table.c.session_id == session_id).values(conversation=chats, user_id=user_id)
+            query = self.chats_table.insert().values(id = uuid.uuid4(), conversation=new_conversation, session_id=session_id, user_id=user_id)
             conn.execute(query)
             trans.commit()
         except Exception as e:
@@ -89,12 +118,11 @@ class Database:
 
 
 if __name__ == '__main__':
-    ai_assistant_db = Database()
-    # metadata.create_all(engine)
-    if not ai_assistant_db.select_user('admin'):
-        ai_assistant_db.insert_user(1, 'admin', 'admin', 'allpass')
-    print(ai_assistant_db.select_user('admin'))
-    # update_chat(1, {role1: 'hello', role2: 'Hi, how may I help?'}, 1)
-    # update_chat(1, {role1: 'how are you', role2: 'I am good, what about you?'}, 1)
-    # print(select_chats(1, conn))
-        
+    db = Database()
+    db.create_tables()
+    if not db.select_user('admin'):
+        db.insert_user('admin', 'admin', '$2b$12$LtjXxkWkFo5LsZSuc23rLuraQIaCI0rublhaTYeaVyEByzbIlFpqa')
+    print(db.select_user('admin'))
+    db.insert_chat({'User': 'hello', 'Assistant': 'Hi, how may I help?'}, 1, 1)
+    db.insert_chat({'User': 'how are you', 'Assistant': 'I am good, what about you?'}, 1, 1)
+    print(db.select_chats(1))
