@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 import uvicorn
+import uuid
 
 app=FastAPI()
 
@@ -19,11 +20,6 @@ ACCESS_TOKEN_EXPIRES_MINUTES = 30
 
 ROLE1='User'
 ROLE2='Assistant'
-
-chats=db.select_chats(SESSION_ID)
-
-chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
-
 
 '''Authentication Routes'''
 
@@ -48,30 +44,63 @@ async def register_user(username: str, email: str, password: str):
 
 '''Authorized Routes'''
 
-@app.get("/users/me/", response_model = User)
+@app.get("/user/", response_model = User)
 async def read_users_me(current_user: TokenData = Depends(current_user)):
     user = get_user(db, current_user.email)
     return user
 
+@app.get('/user/chats/', response_model=list)
+async def get_chats(current_user: TokenData = Depends(current_user)):
+    user = get_user(db, current_user.email)
+    sessions = db.get_sessions(user.id)
+    return sessions
+    # for session in sessions:
+    #     chats = db.select_chats(session, user.id)
+    #     chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
+    #     text = 'Give a title for this chat session in under 7 words'
+    #     prompt = HumanMessagePromptTemplate.from_template(text)
+
+@app.get('/user/chats/{session_id}/')
+async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
+    global current_session_history
+    user = get_user(db, current_user.email)
+    chats=db.select_chats(session_id, user.id)
+    chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
+    current_session_history = {user.id:chat_history}
+    return {'session_id':session_id, 'chats':chats}
+
 
 '''Chat Routes'''
 
-@app.get('/text/')
-async def text_processing(text: str, current_user: TokenData = Depends(current_user)):
+@app.post('/user/chats/{session_id}/text/')
+async def text_processing(session_id: str, text: str = Form(), current_user: TokenData = Depends(current_user)):
     try:
-        response=base_model.chat(chat_history,text)
-        new_chat = {ROLE1:text, ROLE2:response}
         user = get_user(db, current_user.email)
-        db.insert_chat(new_chat, SESSION_ID, user.id)
+        if session_id=='new':
+            session_id = uuid.uuid4()
+            chat_history = base_model.create_chat_history()
+        else:
+            session_id = uuid.UUID(session_id)
+            chat_history = current_session_history[user.id]
+        response=base_model.chat(chat_history, text)
+        new_chat = {ROLE1:text, ROLE2:response}
+        db.insert_chat(new_chat, session_id, user.id)
     except Exception as e:
         return {'Error':str(e)}
-    return new_chat
+    return {'chat':new_chat,'session_id':session_id}
 
-@app.post('/document/')
-async def document_processing(text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
+@app.post('/user/chats/{session_id}/document/')
+async def document_processing(session_id: str, text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
     if not (file.filename.endswith(".pdf") or file.filename.endswith(".docx") or file.filename.endswith(".pptx")):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid File type.")
-    else: 
+    else:
+        user = get_user(db, current_user.email)
+        if session_id=='new':
+            session_id = uuid.uuid4()
+            chat_history = base_model.create_chat_history() 
+        else:
+            session_id = uuid.UUID(session_id)
+            chat_history = current_session_history[user.id]
         temp_document_path = f"temp_{file.filename}"
         try:
             with open(temp_document_path, "wb") as temp_file:
@@ -80,22 +109,28 @@ async def document_processing(text: Optional[str] = Form(None), file: UploadFile
             if text=='':
                 text='What is in this document?'
             prompt=context+' '+text
-            response=base_model.chat(chat_history,prompt)
-            new_chat = {ROLE1:prompt, ROLE2:response}
-            user = get_user(db, current_user.email)
-            db.insert_chat(new_chat, SESSION_ID, user.id)
+            response=base_model.chat(chat_history, prompt)
+            new_chat = {ROLE1:text, ROLE2:response}
+            db.insert_chat(new_chat, session_id, user.id)
         except Exception as e:
             return {'Error':str(e)}
         finally:
             if os.path.exists(temp_document_path):
                 os.remove(temp_document_path)
-        return new_chat
+        return {'chat':new_chat,'session_id':session_id}
 
-@app.post('/image/')
-async def image_processing(text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
+@app.post('/user/chats/{session_id}/image/')
+async def image_processing(session_id: str, text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
     if not (file.content_type.startswith("image/")):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid File type.")
     else:
+        user = get_user(db, current_user.email)
+        if session_id=='new':
+            session_id = uuid.uuid4()
+            chat_history = base_model.create_chat_history()
+        else:
+            session_id = uuid.UUID(session_id)
+            chat_history = current_session_history[user.id]
         temp_image_path = f"temp_{file.filename}"
         try:
             with open(temp_image_path, "wb") as temp_file:
@@ -108,14 +143,13 @@ async def image_processing(text: Optional[str] = Form(None), file: UploadFile = 
             AIresponse=AIMessagePromptTemplate.from_template(response)
             chat_history.append(AIresponse)
             new_chat = {ROLE1:text, ROLE2:response}
-            user = get_user(db, current_user.email)
-            db.insert_chat(new_chat, SESSION_ID, user.id)
+            db.insert_chat(new_chat, session_id, user.id)
         except Exception as e:
             return {'Error':str(e)}
         finally:
             if os.path.exists(temp_image_path):
                 os.remove(temp_image_path)
-        return new_chat
+        return {'chat':new_chat,'session_id':session_id}
 
 
 if __name__=="__main__":

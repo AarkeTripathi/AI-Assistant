@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy import MetaData, Table, Column, ForeignKey, Integer, String, JSON, func
+from sqlalchemy import create_engine, MetaData, Table, Column, ForeignKey, Integer, String, JSON, func, select, insert, distinct, and_
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -26,7 +25,7 @@ class Database:
             'chats', self.metadata,
             Column('id', UUID(as_uuid=True), primary_key=True),
             Column('conversation', JSON),
-            Column('session_id', Integer, nullable=False),
+            Column('session_id',  UUID(as_uuid=True), nullable=False),
             Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
         )
 
@@ -36,29 +35,37 @@ class Database:
 
 
     def generate_user_id(self, conn):  
-        last_user_id = conn.execute(func.max(self.users_table.c.id)).scalar()
+        query = func.max(self.users_table.c.id)
+        last_user_id = conn.execute(query).scalar()
         if not last_user_id:
             return 1
         new_user_id = last_user_id + 1
         return new_user_id
-    
 
-    def generate_session_id(self):
+
+    def get_sessions(self, user_id):
         conn = self.conn
         trans = conn.begin()
-        last_session_id = conn.execute(func.max(self.chats_table.c.session_id)).scalar()
+        query = select(distinct(self.chats_table.c.session_id)).where(self.chats_table.c.user_id == user_id)
+        result = conn.execute(query)
         trans.commit()
-        if not last_session_id:
-            return 1
-        new_session_id = last_session_id + 1
-        return new_session_id
+        session_ids = result.fetchall()
+        sessions = [session_id[0] for session_id in session_ids]
+        return sessions
+    
+    
+    # def last_session_id(self, user_id):
+    #     sessions = self.get_sessions(user_id)
+    #     if not sessions:
+    #         return None
+    #     return max(sessions)
 
 
     def select_user(self, email):
         conn = self.conn
         trans = conn.begin()
-        query = self.users_table.select().where(self.users_table.c.email == email)
-        result = self.conn.execute(query)
+        query = select(self.users_table).where(self.users_table.c.email == email)
+        result = conn.execute(query)
         trans.commit()
         return result.fetchone()
 
@@ -67,7 +74,7 @@ class Database:
         conn = self.conn
         trans = conn.begin()
         try:
-            query = self.users_table.insert().values(id=self.generate_user_id(conn), username=name, email=email, hashed_password=hashed_pwd)
+            query = insert(self.users_table).values(id=self.generate_user_id(conn), username=name, email=email, hashed_password=hashed_pwd)
             conn.execute(query)
             trans.commit()
         except Exception as e:
@@ -75,11 +82,11 @@ class Database:
             print(f"Transaction failed: {e}")
 
 
-    def select_chats(self, session_id):
+    def select_chats(self, session_id, user_id):
         conn = self.conn
         trans = conn.begin()
         try:
-            query = self.chats_table.select().where(self.chats_table.c.session_id == session_id)
+            query = select(self.chats_table).where(and_(self.chats_table.c.session_id == session_id, self.chats_table.c.user_id == user_id))
             result = conn.execute(query)
             trans.commit()
             rows = result.fetchall()
@@ -98,7 +105,7 @@ class Database:
         conn = self.conn
         trans = conn.begin()
         try:
-            query = self.chats_table.insert().values(id = uuid.uuid4(), conversation=new_conversation, session_id=session_id, user_id=user_id)
+            query = insert(self.chats_table).values(id = uuid.uuid4(), conversation=new_conversation, session_id=session_id, user_id=user_id)
             conn.execute(query)
             trans.commit()
         except Exception as e:
@@ -112,6 +119,7 @@ if __name__ == '__main__':
     if not db.select_user('admin'):
         db.insert_user('admin', 'admin', '$2b$12$LtjXxkWkFo5LsZSuc23rLuraQIaCI0rublhaTYeaVyEByzbIlFpqa')
     print(db.select_user('admin'))
-    db.insert_chat({'User': 'hello', 'Assistant': 'Hi, how may I help?'}, 1, 1)
-    db.insert_chat({'User': 'how are you', 'Assistant': 'I am good, what about you?'}, 1, 1)
-    print(db.select_chats(1))
+    temp_session_id = uuid.uuid4()
+    db.insert_chat({'User': 'hello', 'Assistant': 'Hi, how may I help?'}, temp_session_id, 1)
+    db.insert_chat({'User': 'namaste', 'Assistant': 'Namaste, Aap kaise hain'}, temp_session_id, 1)
+    print(db.select_chats(temp_session_id,1))

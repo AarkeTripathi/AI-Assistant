@@ -12,14 +12,14 @@ def load_model():
     model = ChatGroq(api_key=api_key, model="llama-3.3-70b-versatile")
     return model
 
-def create_chat_history(ai_theme):
+def create_chat_history():
+    ai_theme="You are a helpful AI assistant."
     system_message=SystemMessagePromptTemplate.from_template(ai_theme)
     chat_history=[system_message]
     return chat_history
 
 def load_chat_history(chats, role1, role2):
-    ai_theme="You are a helpful AI assistant."
-    chat_history=create_chat_history(ai_theme)
+    chat_history=create_chat_history()
     if chats:
         for chat in chats:
             user_msg=chat[role1]
