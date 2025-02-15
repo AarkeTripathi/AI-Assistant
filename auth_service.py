@@ -13,6 +13,7 @@ ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 logging.getLogger('passlib').setLevel(logging.ERROR)
 
+
 class User(BaseModel):
     id: int
     username: str
@@ -71,11 +72,7 @@ async def current_user(token = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
         token_data = TokenData(email=email)
     except PyJWTError:
         raise credentials_exception
-    return token_data
-    # user = get_user(db, token_data.email)
-    # if not user:
-    #     raise credentials_exception
-    # return user
+    return token_data   #Did not use get_user() here because we are not using the database in this module
 
 async def get_current_active_user(current_user: User = Depends(current_user)):
     if current_user.disabled:
