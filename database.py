@@ -43,22 +43,15 @@ class Database:
         return new_user_id
 
 
-    def get_sessions(self, user_id):
+    def get_session_ids(self, user_id):
         conn = self.conn
         trans = conn.begin()
         query = select(distinct(self.chats_table.c.session_id)).where(self.chats_table.c.user_id == user_id)
         result = conn.execute(query)
         trans.commit()
-        session_ids = result.fetchall()
-        sessions = [session_id[0] for session_id in session_ids]
-        return sessions
-    
-    
-    # def last_session_id(self, user_id):
-    #     sessions = self.get_sessions(user_id)
-    #     if not sessions:
-    #         return None
-    #     return max(sessions)
+        ids = result.fetchall()
+        session_ids = [session_id[0] for session_id in ids]
+        return session_ids
 
 
     def select_user(self, email):

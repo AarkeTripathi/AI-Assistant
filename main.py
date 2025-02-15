@@ -14,8 +14,6 @@ app=FastAPI()
 
 db=Database()
 
-SESSION_ID=1    # For now, we are assuming that the session is the first session
-
 ACCESS_TOKEN_EXPIRES_MINUTES = 30
 
 ROLE1='User'
@@ -52,8 +50,8 @@ async def read_users_me(current_user: TokenData = Depends(current_user)):
 @app.get('/user/chats/', response_model=list)
 async def get_chats(current_user: TokenData = Depends(current_user)):
     user = get_user(db, current_user.email)
-    sessions = db.get_sessions(user.id)
-    return sessions
+    session_ids = db.get_session_ids(user.id)
+    return session_ids
     # for session in sessions:
     #     chats = db.select_chats(session, user.id)
     #     chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
