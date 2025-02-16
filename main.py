@@ -7,10 +7,19 @@ from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTe
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import uuid
 
 app=FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"]
+)
 
 db=Database()
 
