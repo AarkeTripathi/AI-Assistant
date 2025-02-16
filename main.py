@@ -41,7 +41,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/register/")
-async def register_user(username: str, email: str, password: str):
+async def register_user(username: str = Form(), email: str = Form(), password: str = Form()):
     if db.select_user(email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists.")
     hashed_password = get_password_hash(password)
@@ -161,5 +161,5 @@ async def image_processing(session_id: str, text: Optional[str] = Form(None), fi
 
 if __name__=="__main__":
    port = int(os.getenv("PORT", 8000))
-   uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+   uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)
    db.conn.close()
