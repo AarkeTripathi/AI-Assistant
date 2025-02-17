@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,7 +10,9 @@ import logging
 from datetime import datetime, timedelta
 from uuid import UUID
 
-SECRET_KEY = "15311fde7d554538063abda0d6a763dc6dd05327177abbeab9efe903ef3d93f0"
+load_dotenv()
+secret_key = os.getenv('SECRET_KEY')
+
 ALGORITHM = "HS256"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -56,7 +60,7 @@ def create_access_token(data, expires_delta):
     to_encode = data.copy()
     expire = datetime.now() + timedelta(minutes=expires_delta)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=ALGORITHM)
     return encoded_jwt
 
 async def current_user(token = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
@@ -66,7 +70,7 @@ async def current_user(token = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
         headers={"WWW-Authenticate": "Bearer"}
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, secret_key, algorithms=[ALGORITHM])
         username = payload.get('sub')
         if not username:
             raise credentials_exception
