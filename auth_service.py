@@ -6,6 +6,7 @@ from jwt import PyJWTError
 from passlib.context import CryptContext
 import logging
 from datetime import datetime, timedelta
+from uuid import UUID
 
 SECRET_KEY = "15311fde7d554538063abda0d6a763dc6dd05327177abbeab9efe903ef3d93f0"
 ALGORITHM = "HS256"
@@ -15,7 +16,7 @@ logging.getLogger('passlib').setLevel(logging.ERROR)
 
 
 class User(BaseModel):
-    id: int
+    id: UUID
     username: str
     email: str
     # disabled: bool  # This is not needed for now (for disabling inactive users)
@@ -28,7 +29,7 @@ class Token(BaseModel):
     token_type: str
 
 class TokenData(BaseModel):
-    email: str
+    username: str
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -36,15 +37,15 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):    
     return pwd_context.hash(password)  
 
-def get_user(db, email: str):
-    user = db.select_user(email)
+def get_user(db, username: str):
+    user = db.select_user(username)
     if not user:
         return False
     dic={'id':user[0],'username':user[1],'email':user[2],'hashed_password':user[3]}
     return UserInDB(**dic)
 
-def authenticate_user(db, email, password):
-    user = get_user(db, email)
+def authenticate_user(db, username, password):
+    user = get_user(db, username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -66,10 +67,10 @@ async def current_user(token = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get('sub')
-        if not email:
+        username = payload.get('sub')
+        if not username:
             raise credentials_exception
-        token_data = TokenData(email=email)
+        token_data = TokenData(username=username)
     except PyJWTError:
         raise credentials_exception
     return token_data   #Did not use get_user() here because we are not using the database in this module
