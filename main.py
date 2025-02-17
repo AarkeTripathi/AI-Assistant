@@ -1,6 +1,6 @@
 import os
 from models import base_model, image_model
-from document_loader import load_document
+from models.document_loader import load_document
 from database import Database
 from auth_service import User, Token, TokenData, get_user, authenticate_user, create_access_token, get_password_hash, current_user
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
@@ -57,7 +57,7 @@ async def read_users_me(current_user: TokenData = Depends(current_user)):
     return user
 
 @app.get('/user/chats/', response_model=list)
-async def get_chats(current_user: TokenData = Depends(current_user)):
+async def get_sessions(current_user: TokenData = Depends(current_user)):
     user = get_user(db, current_user.username)
     session_ids = db.get_session_ids(user.id)
     return session_ids
