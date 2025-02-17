@@ -15,8 +15,8 @@ class Database:
 
         self.users_table = Table(
             'users', self.metadata,
-            Column('id', Integer, primary_key=True),
-            Column('username', String, nullable=False),
+            Column('id', UUID(as_uuid=True), primary_key=True),
+            Column('username', String, unique=True, nullable=False),
             Column('email', String, unique=True, nullable=False),
             Column('hashed_password', String, nullable=False)
         )
@@ -26,21 +26,15 @@ class Database:
             Column('id', UUID(as_uuid=True), primary_key=True),
             Column('conversation', JSON),
             Column('session_id',  UUID(as_uuid=True), nullable=False),
-            Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
+            Column('user_id', UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
         )
 
 
     def create_tables(self):
         self.metadata.create_all(self.engine)
-
-
-    def generate_user_id(self, conn):  
-        query = func.max(self.users_table.c.id)
-        last_user_id = conn.execute(query).scalar()
-        if not last_user_id:
-            return 1
-        new_user_id = last_user_id + 1
-        return new_user_id
+    
+    def delete_tables(self):
+        self.metadata.drop_all(self.engine)
 
 
     def get_session_ids(self, user_id):
@@ -54,10 +48,10 @@ class Database:
         return session_ids
 
 
-    def select_user(self, email):
+    def select_user(self, username):
         conn = self.conn
         trans = conn.begin()
-        query = select(self.users_table).where(self.users_table.c.email == email)
+        query = select(self.users_table).where(self.users_table.c.username == username)
         result = conn.execute(query)
         trans.commit()
         return result.fetchone()
@@ -67,7 +61,7 @@ class Database:
         conn = self.conn
         trans = conn.begin()
         try:
-            query = insert(self.users_table).values(id=self.generate_user_id(conn), username=name, email=email, hashed_password=hashed_pwd)
+            query = insert(self.users_table).values(id=uuid.uuid4(), username=name, email=email, hashed_password=hashed_pwd)
             conn.execute(query)
             trans.commit()
         except Exception as e:
@@ -111,7 +105,7 @@ if __name__ == '__main__':
     db.create_tables()
     if not db.select_user('admin'):
         db.insert_user('admin', 'admin', '$2b$12$LtjXxkWkFo5LsZSuc23rLuraQIaCI0rublhaTYeaVyEByzbIlFpqa')
-    print(db.select_user('admin'))
+    print(db.select_user('aarke'))
     temp_session_id = uuid.uuid4()
     db.insert_chat({'User': 'hello', 'Assistant': 'Hi, how may I help?'}, temp_session_id, 1)
     db.insert_chat({'User': 'namaste', 'Assistant': 'Namaste, Aap kaise hain'}, temp_session_id, 1)

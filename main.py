@@ -37,12 +37,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
                             detail="Incorrect username or password",
                             headers={"WWW-Authenticate": "Bearer"})
-    access_token = create_access_token(data={'sub':user.email}, expires_delta=ACCESS_TOKEN_EXPIRES_MINUTES)
+    access_token = create_access_token(data={'sub':user.username}, expires_delta=ACCESS_TOKEN_EXPIRES_MINUTES)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/register/")
-async def register_user(username: str, email: str, password: str):
-    if db.select_user(email):
+async def register_user(username: str = Form(), email: str = Form(), password: str = Form()):
+    if db.select_user(username):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists.")
     hashed_password = get_password_hash(password)
     db.insert_user(username, email, hashed_password)
@@ -53,12 +53,12 @@ async def register_user(username: str, email: str, password: str):
 
 @app.get("/user/", response_model = User)
 async def read_users_me(current_user: TokenData = Depends(current_user)):
-    user = get_user(db, current_user.email)
+    user = get_user(db, current_user.username)
     return user
 
 @app.get('/user/chats/', response_model=list)
 async def get_chats(current_user: TokenData = Depends(current_user)):
-    user = get_user(db, current_user.email)
+    user = get_user(db, current_user.username)
     session_ids = db.get_session_ids(user.id)
     return session_ids
     # for session in sessions:
@@ -70,7 +70,7 @@ async def get_chats(current_user: TokenData = Depends(current_user)):
 @app.get('/user/chats/{session_id}/')
 async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
     global current_session_history
-    user = get_user(db, current_user.email)
+    user = get_user(db, current_user.username)
     chats=db.select_chats(session_id, user.id)
     chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
     current_session_history = {user.id:chat_history}
@@ -82,7 +82,7 @@ async def get_chats(session_id: str, current_user: TokenData = Depends(current_u
 @app.post('/user/chats/{session_id}/text/')
 async def text_processing(session_id: str, text: str = Form(), current_user: TokenData = Depends(current_user)):
     try:
-        user = get_user(db, current_user.email)
+        user = get_user(db, current_user.username)
         if session_id=='new':
             session_id = uuid.uuid4()
             chat_history = base_model.create_chat_history()
@@ -101,7 +101,7 @@ async def document_processing(session_id: str, text: Optional[str] = Form(None),
     if not (file.filename.endswith(".pdf") or file.filename.endswith(".docx") or file.filename.endswith(".pptx")):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid File type.")
     else:
-        user = get_user(db, current_user.email)
+        user = get_user(db, current_user.username)
         if session_id=='new':
             session_id = uuid.uuid4()
             chat_history = base_model.create_chat_history() 
@@ -131,7 +131,7 @@ async def image_processing(session_id: str, text: Optional[str] = Form(None), fi
     if not (file.content_type.startswith("image/")):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid File type.")
     else:
-        user = get_user(db, current_user.email)
+        user = get_user(db, current_user.username)
         if session_id=='new':
             session_id = uuid.uuid4()
             chat_history = base_model.create_chat_history()
