@@ -89,7 +89,8 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
         else:
             session_id = uuid.UUID(session_id)
             chat_history = current_session_history[user.id]
-        response=base_model.chat(chat_history, text)
+        chat_history, response=base_model.chat(chat_history, text)
+        current_session_history[user.id] = chat_history
         new_chat = {ROLE1:text, ROLE2:response}
         db.insert_chat(new_chat, session_id, user.id)
     except Exception as e:
@@ -116,7 +117,8 @@ async def document_processing(session_id: str, text: Optional[str] = Form(None),
             if text=='':
                 text='What is in this document?'
             prompt=context+' '+text
-            response=base_model.chat(chat_history, prompt)
+            chat_history, response=base_model.chat(chat_history, text)
+            current_session_history[user.id] = chat_history
             new_chat = {ROLE1:text, ROLE2:response}
             db.insert_chat(new_chat, session_id, user.id)
         except Exception as e:
@@ -149,6 +151,7 @@ async def image_processing(session_id: str, text: Optional[str] = Form(None), fi
             response=image_model.chat(temp_image_path,text)
             AIresponse=AIMessagePromptTemplate.from_template(response)
             chat_history.append(AIresponse)
+            current_session_history[user.id] = chat_history
             new_chat = {ROLE1:text, ROLE2:response}
             db.insert_chat(new_chat, session_id, user.id)
         except Exception as e:
