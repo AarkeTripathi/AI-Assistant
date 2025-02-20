@@ -67,7 +67,7 @@ async def get_sessions(current_user: TokenData = Depends(current_user)):
     #     text = 'Give a title for this chat session in under 7 words'
     #     prompt = HumanMessagePromptTemplate.from_template(text)
 
-@app.get('/user/chats/{session_id}/del/')
+@app.get('/user/chats/{session_id}/')
 async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
     global current_session_history
     user = get_user(db, current_user.username)
@@ -76,7 +76,7 @@ async def get_chats(session_id: str, current_user: TokenData = Depends(current_u
     current_session_history = {user.id:chat_history}
     return {'session_id':session_id, 'chats':chats}
 
-@app.delete('/user/chats/{session_id}/')
+@app.delete('/user/chats/{session_id}/del/')
 async def delete_session(session_id: str, current_user: TokenData = Depends(current_user)):
     try:
         db.delete_session(session_id)
