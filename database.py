@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, MetaData, Table, Column, ForeignKey, Integer, String, JSON, select, insert, delete, distinct
+from sqlalchemy import create_engine, MetaData, Table, Column, ForeignKey, String, JSON, select, insert, delete, distinct
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
