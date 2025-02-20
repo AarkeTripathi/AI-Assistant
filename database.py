@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, MetaData, Table, Column, ForeignKey, Integer, String, JSON, func, select, insert, distinct, and_
+from sqlalchemy import create_engine, MetaData, Table, Column, ForeignKey, Integer, String, JSON, select, insert, delete, distinct
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -69,11 +69,11 @@ class Database:
             print(f"Transaction failed: {e}")
 
 
-    def select_chats(self, session_id, user_id):
+    def select_chats(self, session_id):
         conn = self.conn
         trans = conn.begin()
         try:
-            query = select(self.chats_table).where(and_(self.chats_table.c.session_id == session_id, self.chats_table.c.user_id == user_id))
+            query = select(self.chats_table).where(self.chats_table.c.session_id == session_id)
             result = conn.execute(query)
             trans.commit()
             rows = result.fetchall()
@@ -93,6 +93,18 @@ class Database:
         trans = conn.begin()
         try:
             query = insert(self.chats_table).values(id = uuid.uuid4(), conversation=new_conversation, session_id=session_id, user_id=user_id)
+            conn.execute(query)
+            trans.commit()
+        except Exception as e:
+            trans.rollback()
+            print(f"Transaction failed: {e}")
+
+    
+    def delete_session(self, session_id):
+        conn = self.conn
+        trans = conn.begin()
+        try:
+            query = delete(self.chats_table).where(self.chats_table.c.session_id == session_id)
             conn.execute(query)
             trans.commit()
         except Exception as e:

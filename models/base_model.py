@@ -42,4 +42,4 @@ def chat(chat_history, text):
     # print(f'\nAssistant: {response}\n')
     AIresponse=AIMessagePromptTemplate.from_template(response)
     chat_history.append(AIresponse)
-    return response
+    return chat_history, response

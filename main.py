@@ -1,6 +1,6 @@
 import os
 from models import base_model, image_model
-from document_loader import load_document
+from models.document_loader import load_document
 from database import Database
 from auth_service import User, Token, TokenData, get_user, authenticate_user, create_access_token, get_password_hash, current_user
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
@@ -57,7 +57,7 @@ async def read_users_me(current_user: TokenData = Depends(current_user)):
     return user
 
 @app.get('/user/chats/', response_model=list)
-async def get_chats(current_user: TokenData = Depends(current_user)):
+async def get_sessions(current_user: TokenData = Depends(current_user)):
     user = get_user(db, current_user.username)
     session_ids = db.get_session_ids(user.id)
     return session_ids
@@ -71,10 +71,18 @@ async def get_chats(current_user: TokenData = Depends(current_user)):
 async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
     global current_session_history
     user = get_user(db, current_user.username)
-    chats=db.select_chats(session_id, user.id)
+    chats=db.select_chats(session_id)
     chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
     current_session_history = {user.id:chat_history}
     return {'session_id':session_id, 'chats':chats}
+
+@app.delete('/user/chats/{session_id}/')
+async def delete_session(session_id: str, current_user: TokenData = Depends(current_user)):
+    try:
+        db.delete_session(session_id)
+    except Exception as e:
+        return {'Error':str(e)}
+    return {'message':'Session deleted successfully.'}
 
 
 '''Chat Routes'''
@@ -84,17 +92,19 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
     try:
         user = get_user(db, current_user.username)
         if session_id=='new':
-            session_id = uuid.uuid4()
+            new_session_id = uuid.uuid4()
             chat_history = base_model.create_chat_history()
         else:
-            session_id = uuid.UUID(session_id)
+            new_session_id = uuid.UUID(session_id)
             chat_history = current_session_history[user.id]
-        response=base_model.chat(chat_history, text)
+        chat_history, response=base_model.chat(chat_history, text)
+        if session_id != "new":
+            current_session_history[user.id] = chat_history
         new_chat = {ROLE1:text, ROLE2:response}
-        db.insert_chat(new_chat, session_id, user.id)
+        db.insert_chat(new_chat, new_session_id, user.id)
     except Exception as e:
         return {'Error':str(e)}
-    return {'chat':new_chat,'session_id':session_id}
+    return {'chat':new_chat,'session_id':new_session_id}
 
 @app.post('/user/chats/{session_id}/document/')
 async def document_processing(session_id: str, text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
@@ -103,10 +113,10 @@ async def document_processing(session_id: str, text: Optional[str] = Form(None),
     else:
         user = get_user(db, current_user.username)
         if session_id=='new':
-            session_id = uuid.uuid4()
+            new_session_id = uuid.uuid4()
             chat_history = base_model.create_chat_history() 
         else:
-            session_id = uuid.UUID(session_id)
+            new_session_id = uuid.UUID(session_id)
             chat_history = current_session_history[user.id]
         temp_document_path = f"temp_{file.filename}"
         try:
@@ -116,15 +126,17 @@ async def document_processing(session_id: str, text: Optional[str] = Form(None),
             if text=='':
                 text='What is in this document?'
             prompt=context+' '+text
-            response=base_model.chat(chat_history, prompt)
+            chat_history, response=base_model.chat(chat_history, prompt)
+            if session_id != "new":
+                current_session_history[user.id] = chat_history
             new_chat = {ROLE1:text, ROLE2:response}
-            db.insert_chat(new_chat, session_id, user.id)
+            db.insert_chat(new_chat, new_session_id, user.id)
         except Exception as e:
             return {'Error':str(e)}
         finally:
             if os.path.exists(temp_document_path):
                 os.remove(temp_document_path)
-        return {'chat':new_chat,'session_id':session_id}
+        return {'chat':new_chat,'session_id':new_session_id}
 
 @app.post('/user/chats/{session_id}/image/')
 async def image_processing(session_id: str, text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
@@ -133,10 +145,10 @@ async def image_processing(session_id: str, text: Optional[str] = Form(None), fi
     else:
         user = get_user(db, current_user.username)
         if session_id=='new':
-            session_id = uuid.uuid4()
+            new_session_id = uuid.uuid4()
             chat_history = base_model.create_chat_history()
         else:
-            session_id = uuid.UUID(session_id)
+            new_session_id = uuid.UUID(session_id)
             chat_history = current_session_history[user.id]
         temp_image_path = f"temp_{file.filename}"
         try:
@@ -149,17 +161,20 @@ async def image_processing(session_id: str, text: Optional[str] = Form(None), fi
             response=image_model.chat(temp_image_path,text)
             AIresponse=AIMessagePromptTemplate.from_template(response)
             chat_history.append(AIresponse)
+            if session_id != "new":
+                current_session_history[user.id] = chat_history
             new_chat = {ROLE1:text, ROLE2:response}
-            db.insert_chat(new_chat, session_id, user.id)
+            db.insert_chat(new_chat, new_session_id, user.id)
         except Exception as e:
             return {'Error':str(e)}
         finally:
             if os.path.exists(temp_image_path):
                 os.remove(temp_image_path)
-        return {'chat':new_chat,'session_id':session_id}
+        return {'chat':new_chat,'session_id':new_session_id}
 
 
 if __name__=="__main__":
-   port = int(os.getenv("PORT", 8000))
-   uvicorn.run("main:app", host="0.0.0.0", port=port)
-   db.conn.close()
+    port = int(os.getenv("PORT", 8000))
+    # uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
+    uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
+    db.conn.close()
