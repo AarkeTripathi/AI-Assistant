@@ -40,7 +40,6 @@ def chat(chat_history, text):
     chat_history.append(prompt)
     response=generate_response(chat_history)
     response = response.replace("{", "{{").replace("}", "}}")
-    # print(f'\nAssistant: {response}\n')
     AIresponse=AIMessagePromptTemplate.from_template(response)
     chat_history.append(AIresponse)
     return chat_history, response
@@ -48,6 +47,6 @@ def chat(chat_history, text):
 if __name__=='__main__':
     chat_history = create_chat_history()
     while True:
-        text = input()
+        text = input('User: ')
         chat_history, response = chat(chat_history, text)
-        print(response)
+        print(f'\nAssistant: {response}')
