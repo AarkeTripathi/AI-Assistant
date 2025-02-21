@@ -1,6 +1,6 @@
 import os
 from models import base_model, image_model
-from models.document_loader import load_document
+from models.document_loader import DocumentLoader
 from database import Database
 from auth_service import User, Token, TokenData, get_user, authenticate_user, create_access_token, get_password_hash, current_user
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
@@ -11,6 +11,15 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import uuid
 
+ACCESS_TOKEN_EXPIRES_MINUTES = 30
+MAX_FILE_SIZE = 5242880   #5MB
+ROLE1='User'
+ROLE2='Assistant'
+
+db=Database()
+
+dm = DocumentLoader()
+
 app=FastAPI()
 
 app.add_middleware(
@@ -20,14 +29,6 @@ app.add_middleware(
     allow_methods=["*"],  
     allow_headers=["*"]
 )
-
-db=Database()
-
-ACCESS_TOKEN_EXPIRES_MINUTES = 30
-MAX_FILE_SIZE = 5242880   #5MB
-
-ROLE1='User'
-ROLE2='Assistant'
 
 '''Authentication Routes'''
 
@@ -131,7 +132,7 @@ async def document_processing(session_id: str,
     try:
         with open(temp_document_path, "wb") as temp_file:
             temp_file.write(await file.read())
-        context=load_document(temp_document_path)
+        context=dm.load_document(temp_document_path)
         if text=='':
             text='What is in this document?'
         prompt=context+' '+text
