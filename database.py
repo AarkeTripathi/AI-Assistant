@@ -7,7 +7,7 @@ import uuid
 class Database:
     def __init__(self):
         load_dotenv()
-        database_url = os.getenv('DATABASE_URL_EXT')
+        database_url = os.getenv('DATABASE_URL')
         self.engine = create_engine(database_url, echo=True)
         self.conn = self.engine.connect()
 

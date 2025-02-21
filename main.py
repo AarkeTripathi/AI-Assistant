@@ -24,6 +24,7 @@ app.add_middleware(
 db=Database()
 
 ACCESS_TOKEN_EXPIRES_MINUTES = 30
+MAX_FILE_SIZE = 5242880   #5MB
 
 ROLE1='User'
 ROLE2='Assistant'
@@ -107,74 +108,90 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
     return {'chat':new_chat,'session_id':new_session_id}
 
 @app.post('/user/chats/{session_id}/document/')
-async def document_processing(session_id: str, text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
+async def document_processing(session_id: str, 
+                              text: Optional[str] = Form(None), 
+                              file: UploadFile = File(...), 
+                              current_user: TokenData = Depends(current_user)):
     if not (file.filename.endswith(".pdf") or file.filename.endswith(".docx") or file.filename.endswith(".pptx")):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid File type.")
+    
+    contents = await file.read(MAX_FILE_SIZE + 1)
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File size exceeds 5MB.")
+    file.file.seek(0)
+    
+    user = get_user(db, current_user.username)
+    if session_id=='new':
+        new_session_id = uuid.uuid4()
+        chat_history = base_model.create_chat_history() 
     else:
-        user = get_user(db, current_user.username)
-        if session_id=='new':
-            new_session_id = uuid.uuid4()
-            chat_history = base_model.create_chat_history() 
-        else:
-            new_session_id = uuid.UUID(session_id)
-            chat_history = current_session_history[user.id]
-        temp_document_path = f"temp_{file.filename}"
-        try:
-            with open(temp_document_path, "wb") as temp_file:
-                temp_file.write(await file.read())
-            context=load_document(temp_document_path)
-            if text=='':
-                text='What is in this document?'
-            prompt=context+' '+text
-            chat_history, response=base_model.chat(chat_history, prompt)
-            if session_id != "new":
-                current_session_history[user.id] = chat_history
-            new_chat = {ROLE1:text, ROLE2:response}
-            db.insert_chat(new_chat, new_session_id, user.id)
-        except Exception as e:
-            return {'Error':str(e)}
-        finally:
-            if os.path.exists(temp_document_path):
-                os.remove(temp_document_path)
-        return {'chat':new_chat,'session_id':new_session_id}
+        new_session_id = uuid.UUID(session_id)
+        chat_history = current_session_history[user.id]
+    temp_document_path = f"temp_{file.filename}"
+    try:
+        with open(temp_document_path, "wb") as temp_file:
+            temp_file.write(await file.read())
+        context=load_document(temp_document_path)
+        if text=='':
+            text='What is in this document?'
+        prompt=context+' '+text
+        chat_history, response=base_model.chat(chat_history, prompt)
+        if session_id != "new":
+            current_session_history[user.id] = chat_history
+        new_chat = {ROLE1:text, ROLE2:response}
+        db.insert_chat(new_chat, new_session_id, user.id)
+    except Exception as e:
+        return {'Error':str(e)}
+    finally:
+        if os.path.exists(temp_document_path):
+            os.remove(temp_document_path)
+    return {'chat':new_chat,'session_id':new_session_id}
 
 @app.post('/user/chats/{session_id}/image/')
-async def image_processing(session_id: str, text: Optional[str] = Form(None), file: UploadFile = File(...), current_user: TokenData = Depends(current_user)):
+async def image_processing(session_id: str, 
+                           text: Optional[str] = Form(None), 
+                           file: UploadFile = File(...), 
+                           current_user: TokenData = Depends(current_user)):
     if not (file.content_type.startswith("image/")):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid File type.")
+    
+    contents = await file.read(MAX_FILE_SIZE + 1)
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File size exceeds 5MB.")
+    file.file.seek(0)
+    
+    user = get_user(db, current_user.username)
+    if session_id=='new':
+        new_session_id = uuid.uuid4()
+        chat_history = base_model.create_chat_history()
     else:
-        user = get_user(db, current_user.username)
-        if session_id=='new':
-            new_session_id = uuid.uuid4()
-            chat_history = base_model.create_chat_history()
-        else:
-            new_session_id = uuid.UUID(session_id)
-            chat_history = current_session_history[user.id]
-        temp_image_path = f"temp_{file.filename}"
-        try:
-            with open(temp_image_path, "wb") as temp_file:
-                temp_file.write(await file.read())
-            if text=='':
-                text='What is in this image?'
-            prompt=HumanMessagePromptTemplate.from_template(text)
-            chat_history.append(prompt)
-            response=image_model.chat(temp_image_path,text)
-            AIresponse=AIMessagePromptTemplate.from_template(response)
-            chat_history.append(AIresponse)
-            if session_id != "new":
-                current_session_history[user.id] = chat_history
-            new_chat = {ROLE1:text, ROLE2:response}
-            db.insert_chat(new_chat, new_session_id, user.id)
-        except Exception as e:
-            return {'Error':str(e)}
-        finally:
-            if os.path.exists(temp_image_path):
-                os.remove(temp_image_path)
-        return {'chat':new_chat,'session_id':new_session_id}
+        new_session_id = uuid.UUID(session_id)
+        chat_history = current_session_history[user.id]
+    temp_image_path = f"temp_{file.filename}"
+    try:
+        with open(temp_image_path, "wb") as temp_file:
+            temp_file.write(await file.read())
+        if text=='':
+            text='What is in this image?'
+        prompt=HumanMessagePromptTemplate.from_template(text)
+        chat_history.append(prompt)
+        response=image_model.chat(temp_image_path,text)
+        AIresponse=AIMessagePromptTemplate.from_template(response)
+        chat_history.append(AIresponse)
+        if session_id != "new":
+            current_session_history[user.id] = chat_history
+        new_chat = {ROLE1:text, ROLE2:response}
+        db.insert_chat(new_chat, new_session_id, user.id)
+    except Exception as e:
+        return {'Error':str(e)}
+    finally:
+        if os.path.exists(temp_image_path):
+            os.remove(temp_image_path)
+    return {'chat':new_chat,'session_id':new_session_id}
 
 
 if __name__=="__main__":
     port = int(os.getenv("PORT", 8000))
-    # uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
-    uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
+    uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
+    # uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
     db.conn.close()
