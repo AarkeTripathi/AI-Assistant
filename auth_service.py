@@ -42,7 +42,7 @@ def get_password_hash(password):
     return pwd_context.hash(password)  
 
 def get_user(db, username: str):
-    user = db.select_user(username)
+    user = db.select_user_by_username(username)
     if not user:
         return False
     dic={'id':user[0],'username':user[1],'email':user[2],'hashed_password':user[3]}
