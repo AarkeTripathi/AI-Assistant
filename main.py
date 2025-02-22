@@ -45,13 +45,16 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 @app.post("/register/")
 async def register_user(username: str = Form(), email: str = Form(), password: str = Form()):
-    if db.select_user_by_username(username):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists.")
-    if db.select_user_by_email(email):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
-    hashed_password = get_password_hash(password)
-    db.insert_user(uuid.uuid4() ,username, email, hashed_password)
-    return {"message": "User created successfully."}
+    try:
+        if db.select_user_by_username(username):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists.")
+        if db.select_user_by_email(email):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
+        hashed_password = get_password_hash(password)
+        db.insert_user(uuid.uuid4(), username, email, hashed_password)
+        return {"message": "User created successfully."}
+    except Exception as e:
+        return {'Error':str(e)}
 
 
 '''Authorized Routes'''
@@ -224,6 +227,6 @@ async def image_processing(session_id: str,
 
 if __name__=="__main__":
     port = int(os.getenv("PORT", 8000))
-    # uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
-    uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
+    uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
+    # uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
     db.conn.close()
