@@ -57,19 +57,27 @@ class Database:
     def select_user_by_username(self, username):
         conn = self.conn
         trans = conn.begin()
-        query = select(self.users_table).where(self.users_table.c.username == username)
-        result = conn.execute(query)
-        trans.commit()
-        return result.fetchone()
+        try:
+            query = select(self.users_table).where(self.users_table.c.username == username)
+            result = conn.execute(query)
+            trans.commit()
+            return result.fetchone()
+        except Exception as e:
+            trans.rollback()
+            print(f"Transaction failed: {e}")
     
 
     def select_user_by_email(self, email):
         conn = self.conn
         trans = conn.begin()
-        query = select(self.users_table).where(self.users_table.c.email == email)
-        result = conn.execute(query)
-        trans.commit()
-        return result.fetchone()
+        try:
+            query = select(self.users_table).where(self.users_table.c.email == email)
+            result = conn.execute(query)
+            trans.commit()
+            return result.fetchone()
+        except Exception as e:
+            trans.rollback()
+            print(f"Transaction failed: {e}")
     
 
     def remove_user(self, user_id):
@@ -108,11 +116,15 @@ class Database:
     def get_sessions(self, user_id):
         conn = self.conn
         trans = conn.begin()
-        query = select(self.sessions_table).where(self.sessions_table.c.user_id == user_id)
-        result = conn.execute(query)
-        trans.commit()
-        sessions = result.fetchall()
-        return sessions
+        try:
+            query = select(self.sessions_table).where(self.sessions_table.c.user_id == user_id)
+            result = conn.execute(query)
+            trans.commit()
+            sessions = result.fetchall()
+            return sessions
+        except Exception as e:
+            trans.rollback()
+            print(f"Transaction failed: {e}")
     
 
     def get_session_title(self, session_id):
@@ -178,7 +190,7 @@ class Database:
 
 if __name__ == '__main__':
     db = Database()
-    db.create_tables()
+    # db.create_tables()
     # if not db.select_user_by_username('admin'):
     #     db.insert_user('admin', 'admin', '$2b$12$LtjXxkWkFo5LsZSuc23rLuraQIaCI0rublhaTYeaVyEByzbIlFpqa')
     # print(db.select_user_by_email('admin'))

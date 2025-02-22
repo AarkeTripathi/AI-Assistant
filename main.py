@@ -2,6 +2,7 @@ import os
 from models import base_model, image_model
 from models.document_loader import DocumentLoader
 from database import Database
+from cache import Cache
 from auth_service import User, Token, TokenData, get_user, authenticate_user, create_access_token, get_password_hash, current_user
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
 from typing import Optional
@@ -18,6 +19,8 @@ ROLE2 = 'Assistant'
 TITLE_QUERY = 'Generate a title for this chat in under 7 words.'
 
 db=Database()
+
+r = Cache()
 
 dm = DocumentLoader()
 
@@ -45,13 +48,16 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 @app.post("/register/")
 async def register_user(username: str = Form(), email: str = Form(), password: str = Form()):
-    if db.select_user_by_username(username):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists.")
-    if db.select_user_by_email(email):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
-    hashed_password = get_password_hash(password)
-    db.insert_user(uuid.uuid4() ,username, email, hashed_password)
-    return {"message": "User created successfully."}
+    try:
+        if db.select_user_by_username(username):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists.")
+        if db.select_user_by_email(email):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
+        hashed_password = get_password_hash(password)
+        db.insert_user(uuid.uuid4(), username, email, hashed_password)
+        return {"message": "User created successfully."}
+    except Exception as e:
+        return {'Error':str(e)}
 
 
 '''Authorized Routes'''
@@ -84,13 +90,14 @@ async def get_sessions(current_user: TokenData = Depends(current_user)):
 
 @app.get('/user/chats/{session_id}/')
 async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
-    global current_session_history
+    # global current_session_history
     try:
         user = get_user(db, current_user.username)
         chats = db.select_chats(session_id)
         title = db.get_session_title(session_id)
         chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
-        current_session_history = {user.id:chat_history}
+        # current_session_history = {user.id:chat_history}
+        await r.store_chat_history(session_id, chat_history)
     except Exception as e:
         return {'Error':str(e)}
     return {'chats':chats, 'session_id':session_id, 'session_title':title}
@@ -113,7 +120,9 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
         if session_id=='new':
             chat_history = base_model.create_chat_history()
         else:
-            chat_history = current_session_history[user.id]
+            # chat_history = current_session_history[user.id]
+            chat_history = await r.get_chat_history(session_id)
+        text = text.replace("{", "{{").replace("}", "}}")
         chat_history, response=base_model.chat(chat_history, text)
         if session_id == "new":
             session_id = uuid.uuid4()
@@ -122,7 +131,8 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
         else:
             session_id = uuid.UUID(session_id)
             title = db.get_session_title(session_id)
-            current_session_history[user.id] = chat_history
+        # current_session_history[user.id] = chat_history
+        await r.store_chat_history(session_id, chat_history)
         new_chat = {ROLE1:text, ROLE2:response}
         db.insert_chat(uuid.uuid4(), new_chat, session_id)
     except Exception as e:
@@ -148,7 +158,8 @@ async def document_processing(session_id: str,
         if session_id=='new':
             chat_history = base_model.create_chat_history()
         else:
-            chat_history = current_session_history[user.id]
+            # chat_history = current_session_history[user.id]
+            chat_history = await r.get_chat_history(session_id)
         temp_document_path = f"temp_{file.filename}"
         with open(temp_document_path, "wb") as temp_file:
             temp_file.write(await file.read())
@@ -156,6 +167,7 @@ async def document_processing(session_id: str,
         if text=='':
             text='What is in this document?'
         prompt=context+' '+text
+        prompt = prompt.replace("{", "{{").replace("}", "}}")
         chat_history, response=base_model.chat(chat_history, prompt)
         if session_id == "new":
             session_id = uuid.uuid4()
@@ -164,7 +176,8 @@ async def document_processing(session_id: str,
         else:
             session_id = uuid.UUID(session_id)
             title = db.get_session_title(session_id)
-            current_session_history[user.id] = chat_history
+        # current_session_history[user.id] = chat_history
+        await r.store_chat_history(session_id, chat_history)
         new_chat = {ROLE1:text, ROLE2:response}
         db.insert_chat(uuid.uuid4(), new_chat, session_id)
     except Exception as e:
@@ -193,15 +206,18 @@ async def image_processing(session_id: str,
         if session_id=='new':
             chat_history = base_model.create_chat_history()
         else:
-            chat_history = current_session_history[user.id]
+            # chat_history = current_session_history[user.id]
+            chat_history = await r.get_chat_history(session_id)
         temp_image_path = f"temp_{file.filename}"
         with open(temp_image_path, "wb") as temp_file:
             temp_file.write(await file.read())
         if text=='':
             text='What is in this image?'
+        text = text.replace("{", "{{").replace("}", "}}")
         prompt=HumanMessagePromptTemplate.from_template(text)
         chat_history.append(prompt)
         response=image_model.chat(temp_image_path,text)
+        response = response.replace("{", "{{").replace("}", "}}")
         AIresponse=AIMessagePromptTemplate.from_template(response)
         chat_history.append(AIresponse)
         if session_id == "new":
@@ -211,7 +227,8 @@ async def image_processing(session_id: str,
         else:
             session_id = uuid.UUID(session_id)
             title = db.get_session_title(session_id)
-            current_session_history[user.id] = chat_history
+        # current_session_history[user.id] = chat_history
+        await r.store_chat_history(session_id, chat_history)
         new_chat = {ROLE1:text, ROLE2:response}
         db.insert_chat(uuid.uuid4(), new_chat, session_id)
     except Exception as e:
