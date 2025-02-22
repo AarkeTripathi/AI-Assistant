@@ -13,8 +13,9 @@ import uuid
 
 ACCESS_TOKEN_EXPIRES_MINUTES = 30
 MAX_FILE_SIZE = 5242880   #5MB
-ROLE1='User'
-ROLE2='Assistant'
+ROLE1 = 'User'
+ROLE2 = 'Assistant'
+TITLE_QUERY = 'Generate a title for this chat in under 7 words.'
 
 db=Database()
 
@@ -44,10 +45,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 @app.post("/register/")
 async def register_user(username: str = Form(), email: str = Form(), password: str = Form()):
-    if db.select_user(username):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists.")
+    if db.select_user_by_username(username):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists.")
+    if db.select_user_by_email(email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
     hashed_password = get_password_hash(password)
-    db.insert_user(username, email, hashed_password)
+    db.insert_user(uuid.uuid4() ,username, email, hashed_password)
     return {"message": "User created successfully."}
 
 
@@ -58,25 +61,39 @@ async def read_users_me(current_user: TokenData = Depends(current_user)):
     user = get_user(db, current_user.username)
     return user
 
-@app.get('/user/chats/', response_model=list)
+@app.delete('/user/del/')
+async def delete_account(current_user: TokenData = Depends(current_user)):
+    try:
+        user = get_user(db, current_user.username)
+        db.remove_user(user.id)
+    except Exception as e:
+        return {'Error':str(e)}
+    return {'message':'Account deleted successfully.'}
+
+@app.get('/user/chats/')
 async def get_sessions(current_user: TokenData = Depends(current_user)):
-    user = get_user(db, current_user.username)
-    session_ids = db.get_session_ids(user.id)
-    return session_ids
-    # for session in sessions:
-    #     chats = db.select_chats(session, user.id)
-    #     chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
-    #     text = 'Give a title for this chat session in under 7 words'
-    #     prompt = HumanMessagePromptTemplate.from_template(text)
+    try:
+        user = get_user(db, current_user.username)
+        sessions = db.get_sessions(user.id)
+        session_dict = {}
+        for session in sessions:
+            session_dict[session[0]] = session[1]
+        return session_dict
+    except Exception as e:
+        return {'Error':str(e)}
 
 @app.get('/user/chats/{session_id}/')
 async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
     global current_session_history
-    user = get_user(db, current_user.username)
-    chats=db.select_chats(session_id)
-    chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
-    current_session_history = {user.id:chat_history}
-    return {'session_id':session_id, 'chats':chats}
+    try:
+        user = get_user(db, current_user.username)
+        chats = db.select_chats(session_id)
+        title = db.get_session_title(session_id)
+        chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
+        current_session_history = {user.id:chat_history}
+    except Exception as e:
+        return {'Error':str(e)}
+    return {'chats':chats, 'session_id':session_id, 'session_title':title}
 
 @app.delete('/user/chats/{session_id}/del/')
 async def delete_session(session_id: str, current_user: TokenData = Depends(current_user)):
@@ -94,19 +111,24 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
     try:
         user = get_user(db, current_user.username)
         if session_id=='new':
-            new_session_id = uuid.uuid4()
             chat_history = base_model.create_chat_history()
         else:
-            new_session_id = uuid.UUID(session_id)
             chat_history = current_session_history[user.id]
         chat_history, response=base_model.chat(chat_history, text)
-        if session_id != "new":
+        if session_id == "new":
+            session_id = uuid.uuid4()
+            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            db.insert_session(session_id, title, user.id)
+        else:
+            session_id = uuid.UUID(session_id)
+            title = db.get_session_title(session_id)
             current_session_history[user.id] = chat_history
         new_chat = {ROLE1:text, ROLE2:response}
-        db.insert_chat(new_chat, new_session_id, user.id)
+        db.insert_chat(uuid.uuid4(), new_chat, session_id)
     except Exception as e:
         return {'Error':str(e)}
-    return {'chat':new_chat,'session_id':new_session_id}
+    return {'chat':new_chat, 'session_id':session_id, 'session_title':title}
+    
 
 @app.post('/user/chats/{session_id}/document/')
 async def document_processing(session_id: str, 
@@ -120,16 +142,14 @@ async def document_processing(session_id: str,
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File size exceeds 5MB.")
     file.file.seek(0)
-    
-    user = get_user(db, current_user.username)
-    if session_id=='new':
-        new_session_id = uuid.uuid4()
-        chat_history = base_model.create_chat_history() 
-    else:
-        new_session_id = uuid.UUID(session_id)
-        chat_history = current_session_history[user.id]
-    temp_document_path = f"temp_{file.filename}"
+
     try:
+        user = get_user(db, current_user.username)
+        if session_id=='new':
+            chat_history = base_model.create_chat_history()
+        else:
+            chat_history = current_session_history[user.id]
+        temp_document_path = f"temp_{file.filename}"
         with open(temp_document_path, "wb") as temp_file:
             temp_file.write(await file.read())
         context=dm.load_document(temp_document_path)
@@ -137,16 +157,23 @@ async def document_processing(session_id: str,
             text='What is in this document?'
         prompt=context+' '+text
         chat_history, response=base_model.chat(chat_history, prompt)
-        if session_id != "new":
+        if session_id == "new":
+            session_id = uuid.uuid4()
+            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            db.insert_session(session_id, title, user.id)
+        else:
+            session_id = uuid.UUID(session_id)
+            title = db.get_session_title(session_id)
             current_session_history[user.id] = chat_history
         new_chat = {ROLE1:text, ROLE2:response}
-        db.insert_chat(new_chat, new_session_id, user.id)
+        db.insert_chat(uuid.uuid4(), new_chat, session_id)
     except Exception as e:
         return {'Error':str(e)}
     finally:
         if os.path.exists(temp_document_path):
             os.remove(temp_document_path)
-    return {'chat':new_chat,'session_id':new_session_id}
+    return {'chat':new_chat, 'session_id':session_id, 'session_title':title}
+
 
 @app.post('/user/chats/{session_id}/image/')
 async def image_processing(session_id: str, 
@@ -161,15 +188,13 @@ async def image_processing(session_id: str,
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File size exceeds 5MB.")
     file.file.seek(0)
     
-    user = get_user(db, current_user.username)
-    if session_id=='new':
-        new_session_id = uuid.uuid4()
-        chat_history = base_model.create_chat_history()
-    else:
-        new_session_id = uuid.UUID(session_id)
-        chat_history = current_session_history[user.id]
-    temp_image_path = f"temp_{file.filename}"
     try:
+        user = get_user(db, current_user.username)
+        if session_id=='new':
+            chat_history = base_model.create_chat_history()
+        else:
+            chat_history = current_session_history[user.id]
+        temp_image_path = f"temp_{file.filename}"
         with open(temp_image_path, "wb") as temp_file:
             temp_file.write(await file.read())
         if text=='':
@@ -179,16 +204,22 @@ async def image_processing(session_id: str,
         response=image_model.chat(temp_image_path,text)
         AIresponse=AIMessagePromptTemplate.from_template(response)
         chat_history.append(AIresponse)
-        if session_id != "new":
+        if session_id == "new":
+            session_id = uuid.uuid4()
+            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            db.insert_session(session_id, title, user.id)
+        else:
+            session_id = uuid.UUID(session_id)
+            title = db.get_session_title(session_id)
             current_session_history[user.id] = chat_history
         new_chat = {ROLE1:text, ROLE2:response}
-        db.insert_chat(new_chat, new_session_id, user.id)
+        db.insert_chat(uuid.uuid4(), new_chat, session_id)
     except Exception as e:
         return {'Error':str(e)}
     finally:
         if os.path.exists(temp_image_path):
             os.remove(temp_image_path)
-    return {'chat':new_chat,'session_id':new_session_id}
+    return {'chat':new_chat, 'session_id':session_id, 'session_title':title}
 
 
 if __name__=="__main__":
