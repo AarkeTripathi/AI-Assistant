@@ -122,7 +122,6 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
         else:
             # chat_history = current_session_history[user.id]
             chat_history = await r.get_chat_history(session_id)
-        text = text.replace("{", "{{").replace("}", "}}")
         response=base_model.chat(chat_history, text)
         if session_id == "new":
             session_id = uuid.uuid4()
@@ -167,7 +166,6 @@ async def document_processing(session_id: str,
         if text=='':
             text='What is in this document?'
         prompt=context+' '+text
-        prompt = prompt.replace("{", "{{").replace("}", "}}")
         response=base_model.chat(chat_history, prompt)
         if session_id == "new":
             session_id = uuid.uuid4()
@@ -218,7 +216,7 @@ async def image_processing(session_id: str,
         chat_history.append(prompt)
         response=image_model.chat(temp_image_path,text)
         AIresponse = response.replace("{", "{{").replace("}", "}}")
-        AIresponse=AIMessagePromptTemplate.from_template(response)
+        AIresponse=AIMessagePromptTemplate.from_template(AIresponse)
         chat_history.append(AIresponse)
         if session_id == "new":
             session_id = uuid.uuid4()

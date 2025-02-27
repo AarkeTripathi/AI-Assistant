@@ -36,11 +36,12 @@ def generate_response(chat_history):
     return response
 
 def chat(chat_history, text):
+    text = text.replace("{", "{{").replace("}", "}}")
     prompt=HumanMessagePromptTemplate.from_template(text)
     chat_history.append(prompt)
     response=generate_response(chat_history)
     AIresponse = response.replace("{", "{{").replace("}", "}}")
-    AIresponse=AIMessagePromptTemplate.from_template(response)
+    AIresponse=AIMessagePromptTemplate.from_template(AIresponse)
     chat_history.append(AIresponse)
     return response
 
@@ -48,5 +49,8 @@ if __name__=='__main__':
     chat_history = create_chat_history()
     while True:
         text = input('User: ')
+        if text == '\\bye':
+            print("\nAssistant: Nice Chatting with you.")
+            break
         response = chat(chat_history, text)
-        print(f'\nAssistant: {response}')
+        print(f'\nAssistant: {response}\n')
