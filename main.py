@@ -123,10 +123,10 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
             # chat_history = current_session_history[user.id]
             chat_history = await r.get_chat_history(session_id)
         text = text.replace("{", "{{").replace("}", "}}")
-        chat_history, response=base_model.chat(chat_history, text)
+        response=base_model.chat(chat_history, text)
         if session_id == "new":
             session_id = uuid.uuid4()
-            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            title = base_model.chat(chat_history, TITLE_QUERY)
             db.insert_session(session_id, title, user.id)
         else:
             session_id = uuid.UUID(session_id)
@@ -168,10 +168,10 @@ async def document_processing(session_id: str,
             text='What is in this document?'
         prompt=context+' '+text
         prompt = prompt.replace("{", "{{").replace("}", "}}")
-        chat_history, response=base_model.chat(chat_history, prompt)
+        response=base_model.chat(chat_history, prompt)
         if session_id == "new":
             session_id = uuid.uuid4()
-            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            title = base_model.chat(chat_history, TITLE_QUERY)
             db.insert_session(session_id, title, user.id)
         else:
             session_id = uuid.UUID(session_id)
@@ -222,7 +222,7 @@ async def image_processing(session_id: str,
         chat_history.append(AIresponse)
         if session_id == "new":
             session_id = uuid.uuid4()
-            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            title = base_model.chat(chat_history, TITLE_QUERY)
             db.insert_session(session_id, title, user.id)
         else:
             session_id = uuid.UUID(session_id)

@@ -42,7 +42,7 @@ def chat(chat_history, text):
     AIresponse = response.replace("{", "{{").replace("}", "}}")
     AIresponse=AIMessagePromptTemplate.from_template(response)
     chat_history.append(AIresponse)
-    return chat_history, response
+    return response
 
 if __name__=='__main__':
     chat_history = create_chat_history()
