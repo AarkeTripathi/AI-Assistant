@@ -217,7 +217,7 @@ async def image_processing(session_id: str,
         prompt=HumanMessagePromptTemplate.from_template(text)
         chat_history.append(prompt)
         response=image_model.chat(temp_image_path,text)
-        response = response.replace("{", "{{").replace("}", "}}")
+        AIresponse = response.replace("{", "{{").replace("}", "}}")
         AIresponse=AIMessagePromptTemplate.from_template(response)
         chat_history.append(AIresponse)
         if session_id == "new":

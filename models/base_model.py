@@ -39,7 +39,7 @@ def chat(chat_history, text):
     prompt=HumanMessagePromptTemplate.from_template(text)
     chat_history.append(prompt)
     response=generate_response(chat_history)
-    response = response.replace("{", "{{").replace("}", "}}")
+    AIresponse = response.replace("{", "{{").replace("}", "}}")
     AIresponse=AIMessagePromptTemplate.from_template(response)
     chat_history.append(AIresponse)
     return chat_history, response
