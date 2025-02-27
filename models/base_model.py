@@ -40,7 +40,7 @@ def chat(chat_history, text):
     chat_history.append(prompt)
     response=generate_response(chat_history)
     AIresponse = response.replace("{", "{{").replace("}", "}}")
-    AIresponse=AIMessagePromptTemplate.from_template(response)
+    AIresponse=AIMessagePromptTemplate.from_template(AIresponse)
     chat_history.append(AIresponse)
     return response
 

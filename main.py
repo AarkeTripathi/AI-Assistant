@@ -218,7 +218,7 @@ async def image_processing(session_id: str,
         chat_history.append(prompt)
         response=image_model.chat(temp_image_path,text)
         AIresponse = response.replace("{", "{{").replace("}", "}}")
-        AIresponse=AIMessagePromptTemplate.from_template(response)
+        AIresponse=AIMessagePromptTemplate.from_template(AIresponse)
         chat_history.append(AIresponse)
         if session_id == "new":
             session_id = uuid.uuid4()
