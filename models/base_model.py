@@ -36,13 +36,14 @@ def generate_response(chat_history):
     return response
 
 def chat(chat_history, text):
+    text = text.replace("{", "{{").replace("}", "}}")
     prompt=HumanMessagePromptTemplate.from_template(text)
     chat_history.append(prompt)
     response=generate_response(chat_history)
-    response = response.replace("{", "{{").replace("}", "}}")
-    AIresponse=AIMessagePromptTemplate.from_template(response)
+    AIresponse = response.replace("{", "{{").replace("}", "}}")
+    AIresponse=AIMessagePromptTemplate.from_template(AIresponse)
     chat_history.append(AIresponse)
-    return chat_history, response
+    return response
 
 if __name__=='__main__':
     chat_history = create_chat_history()

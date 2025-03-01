@@ -20,8 +20,9 @@ class Cache:
     async def get_chat_history(self, session_id):
         try:
             session_id = str(session_id)
-            data = await self.client.get(session_id)
-            return pickle.loads(data) if data else None
+            serialized_data = await self.client.get(session_id)
+            chat_history = pickle.loads(serialized_data)
+            return chat_history
         except Exception as e:
             return {"Redis Fetch Error": str(e)}
         

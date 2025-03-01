@@ -122,11 +122,10 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
         else:
             # chat_history = current_session_history[user.id]
             chat_history = await r.get_chat_history(session_id)
-        text = text.replace("{", "{{").replace("}", "}}")
-        chat_history, response=base_model.chat(chat_history, text)
+        response=base_model.chat(chat_history, text)
         if session_id == "new":
             session_id = uuid.uuid4()
-            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            title = base_model.chat(chat_history, TITLE_QUERY)
             db.insert_session(session_id, title, user.id)
         else:
             session_id = uuid.UUID(session_id)
@@ -167,11 +166,10 @@ async def document_processing(session_id: str,
         if text=='':
             text='What is in this document?'
         prompt=context+' '+text
-        prompt = prompt.replace("{", "{{").replace("}", "}}")
-        chat_history, response=base_model.chat(chat_history, prompt)
+        response=base_model.chat(chat_history, prompt)
         if session_id == "new":
             session_id = uuid.uuid4()
-            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            title = base_model.chat(chat_history, TITLE_QUERY)
             db.insert_session(session_id, title, user.id)
         else:
             session_id = uuid.UUID(session_id)
@@ -213,16 +211,16 @@ async def image_processing(session_id: str,
             temp_file.write(await file.read())
         if text=='':
             text='What is in this image?'
-        text = text.replace("{", "{{").replace("}", "}}")
-        prompt=HumanMessagePromptTemplate.from_template(text)
+        prompt = text.replace("{", "{{").replace("}", "}}")
+        prompt=HumanMessagePromptTemplate.from_template(prompt)
         chat_history.append(prompt)
         response=image_model.chat(temp_image_path,text)
-        response = response.replace("{", "{{").replace("}", "}}")
-        AIresponse=AIMessagePromptTemplate.from_template(response)
+        AIresponse = response.replace("{", "{{").replace("}", "}}")
+        AIresponse=AIMessagePromptTemplate.from_template(AIresponse)
         chat_history.append(AIresponse)
         if session_id == "new":
             session_id = uuid.uuid4()
-            discard_chat_history, title = base_model.chat(chat_history, TITLE_QUERY)
+            title = base_model.chat(chat_history, TITLE_QUERY)
             db.insert_session(session_id, title, user.id)
         else:
             session_id = uuid.UUID(session_id)
