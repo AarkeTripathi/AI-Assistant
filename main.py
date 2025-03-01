@@ -121,7 +121,7 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
         else:
             # chat_history = current_session_history[user.id]
             chat_history = await r.get_chat_history(session_id)
-        text = text.replace("{", "{{").replace("}", "}}")
+        
         response=base_model.chat(chat_history, text)
         if session_id == "new":
             session_id = uuid.uuid4()
@@ -166,7 +166,7 @@ async def document_processing(session_id: str,
         if text=='':
             text='What is in this document?'
         prompt=context+' '+text
-        prompt = prompt.replace("{", "{{").replace("}", "}}")
+        
         response=base_model.chat(chat_history, prompt)
         if session_id == "new":
             session_id = uuid.uuid4()
@@ -240,6 +240,6 @@ async def image_processing(session_id: str,
 
 if __name__=="__main__":
     port = int(os.getenv("PORT", 8000))
-    # uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
-    uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
+    uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
+    # uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
     db.conn.close()
