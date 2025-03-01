@@ -92,7 +92,6 @@ async def get_sessions(current_user: TokenData = Depends(current_user)):
 async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
     # global current_session_history
     try:
-        user = get_user(db, current_user.username)
         chats = db.select_chats(session_id)
         title = db.get_session_title(session_id)
         chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
@@ -122,6 +121,7 @@ async def text_processing(session_id: str, text: str = Form(), current_user: Tok
         else:
             # chat_history = current_session_history[user.id]
             chat_history = await r.get_chat_history(session_id)
+        
         response=base_model.chat(chat_history, text)
         if session_id == "new":
             session_id = uuid.uuid4()
@@ -166,9 +166,11 @@ async def document_processing(session_id: str,
         if text=='':
             text='What is in this document?'
         prompt=context+' '+text
+        
         response=base_model.chat(chat_history, prompt)
         if session_id == "new":
             session_id = uuid.uuid4()
+            title = base_model.chat(chat_history, TITLE_QUERY)
             title = base_model.chat(chat_history, TITLE_QUERY)
             db.insert_session(session_id, title, user.id)
         else:
@@ -211,8 +213,8 @@ async def image_processing(session_id: str,
             temp_file.write(await file.read())
         if text=='':
             text='What is in this image?'
-        text = text.replace("{", "{{").replace("}", "}}")
-        prompt=HumanMessagePromptTemplate.from_template(text)
+        prompt = text.replace("{", "{{").replace("}", "}}")
+        prompt=HumanMessagePromptTemplate.from_template(prompt)
         chat_history.append(prompt)
         response=image_model.chat(temp_image_path,text)
         AIresponse = response.replace("{", "{{").replace("}", "}}")
