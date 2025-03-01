@@ -49,5 +49,5 @@ if __name__=='__main__':
     chat_history = create_chat_history()
     while True:
         text = input('User: ')
-        chat_history, response = chat(chat_history, text)
+        response = chat(chat_history, text)
         print(f'\nAssistant: {response}')
