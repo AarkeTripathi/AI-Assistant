@@ -24,6 +24,7 @@ def load_chat_history(chats, role1, role2):
         for chat in chats:
             user_msg=chat[role1]
             ai_msg=chat[role2]
+            user_msg, ai_msg = user_msg.replace("{", "{{").replace("}", "}}"), ai_msg.replace("{", "{{").replace("}", "}}")
             chat_history.append(HumanMessagePromptTemplate.from_template(user_msg))
             chat_history.append(AIMessagePromptTemplate.from_template(ai_msg))
     return chat_history

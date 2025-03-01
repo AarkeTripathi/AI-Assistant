@@ -92,7 +92,6 @@ async def get_sessions(current_user: TokenData = Depends(current_user)):
 async def get_chats(session_id: str, current_user: TokenData = Depends(current_user)):
     # global current_session_history
     try:
-        user = get_user(db, current_user.username)
         chats = db.select_chats(session_id)
         title = db.get_session_title(session_id)
         chat_history = base_model.load_chat_history(chats, ROLE1, ROLE2)
@@ -241,6 +240,6 @@ async def image_processing(session_id: str,
 
 if __name__=="__main__":
     port = int(os.getenv("PORT", 8000))
-    # uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
-    uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
+    uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
+    # uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
     db.conn.close()
