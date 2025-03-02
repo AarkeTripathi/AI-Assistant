@@ -66,7 +66,7 @@ def create_token(data, expires_delta, refresh: bool = False):
     encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def current_user(token = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+async def current_user(token = Depends(OAuth2PasswordBearer(tokenUrl="login"))):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
