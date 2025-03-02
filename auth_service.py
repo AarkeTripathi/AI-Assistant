@@ -28,9 +28,12 @@ class User(BaseModel):
 class UserInDB(User):
     hashed_password: str
 
-class Token(BaseModel):
+class AccessToken(BaseModel):
     access_token: str
     token_type: str
+
+class Token(AccessToken):
+    refresh_token: str | None = None
 
 class TokenData(BaseModel):
     username: str
@@ -56,10 +59,10 @@ def authenticate_user(db, username, password):
         return False
     return user
 
-def create_access_token(data, expires_delta):
+def create_token(data, expires_delta, refresh: bool = False):
     to_encode = data.copy()
     expire = datetime.now() + timedelta(minutes=expires_delta)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "refresh": refresh})
     encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -86,3 +89,5 @@ async def get_current_active_user(current_user: User = Depends(current_user)):
 
 if __name__ == '__main__':
     print(get_password_hash('allpass'))
+    access_token = create_token(data={'sub':"aarke"}, expires_delta=30)
+    print(type(access_token))

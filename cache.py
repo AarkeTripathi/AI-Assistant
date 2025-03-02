@@ -10,21 +10,15 @@ class Cache:
         self.client = Redis.from_url(redis_url)
 
     async def store_chat_history(self, session_id, chat_history):
-        try:
-            session_id = str(session_id)
-            serialized_data = pickle.dumps(chat_history)
-            await self.client.set(session_id, serialized_data, ex=1800)
-        except Exception as e:
-            return {"Redis Store Error": str(e)}
+        session_id = str(session_id)
+        serialized_data = pickle.dumps(chat_history)
+        await self.client.set(session_id, serialized_data, ex=1800)
 
     async def get_chat_history(self, session_id):
-        try:
-            session_id = str(session_id)
-            serialized_data = await self.client.get(session_id)
-            chat_history = pickle.loads(serialized_data)
-            return chat_history
-        except Exception as e:
-            return {"Redis Fetch Error": str(e)}
+        session_id = str(session_id)
+        serialized_data = await self.client.get(session_id)
+        chat_history = pickle.loads(serialized_data)
+        return chat_history
         
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ from models import base_model, image_model
 from models.document_loader import DocumentLoader
 from database import Database
 from cache import Cache
-from auth_service import User, Token, TokenData, get_user, authenticate_user, create_access_token, get_password_hash, current_user
+from auth_service import User, Token, AccessToken, TokenData, get_user, authenticate_user, create_token, get_password_hash, current_user
 from langchain_core.prompts import HumanMessagePromptTemplate, AIMessagePromptTemplate
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status
@@ -13,6 +13,7 @@ import uvicorn
 import uuid
 
 ACCESS_TOKEN_EXPIRES_MINUTES = 30
+REFRESH_TOKEN_EXPIRES_MINUTES = 2880    #2days
 MAX_FILE_SIZE = 5242880   #5MB
 ROLE1 = 'User'
 ROLE2 = 'Assistant'
@@ -36,16 +37,6 @@ app.add_middleware(
 
 '''Authentication Routes'''
 
-@app.post("/token/", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
-                            detail="Incorrect username or password",
-                            headers={"WWW-Authenticate": "Bearer"})
-    access_token = create_access_token(data={'sub':user.username}, expires_delta=ACCESS_TOKEN_EXPIRES_MINUTES)
-    return {"access_token": access_token, "token_type": "bearer"}
-
 @app.post("/register/")
 async def register_user(username: str = Form(), email: str = Form(), password: str = Form()):
     try:
@@ -58,6 +49,28 @@ async def register_user(username: str = Form(), email: str = Form(), password: s
         return {"message": "User created successfully."}
     except Exception as e:
         return {'Error':str(e)}
+
+@app.post("/login/", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
+                            detail="Incorrect username or password",
+                            headers={"WWW-Authenticate": "Bearer"})
+    access_token = create_token(data={'sub':user.username}, expires_delta=ACCESS_TOKEN_EXPIRES_MINUTES)
+    refresh_token = create_token(data={'sub':user.username}, expires_delta=REFRESH_TOKEN_EXPIRES_MINUTES, refresh=True)
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
+
+@app.post("/token/", response_model=AccessToken)
+async def login_for_access_token(refresh_token: str = Form()):
+    token_data = await current_user(refresh_token)
+    user = get_user(db, token_data.username)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
+                            detail="Invalid User",
+                            headers={"WWW-Authenticate": "Bearer"})
+    access_token = create_token(data={'sub':user.username}, expires_delta=ACCESS_TOKEN_EXPIRES_MINUTES)
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 '''Authorized Routes'''
@@ -241,6 +254,6 @@ async def image_processing(session_id: str,
 
 if __name__=="__main__":
     port = int(os.getenv("PORT", 8000))
-    # uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
-    uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
+    uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
+    # uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
     db.conn.close()

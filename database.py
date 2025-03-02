@@ -51,7 +51,7 @@ class Database:
             trans.commit()
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
 
 
     def select_user_by_username(self, username):
@@ -64,7 +64,7 @@ class Database:
             return result.fetchone()
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
     
 
     def select_user_by_email(self, email):
@@ -77,7 +77,7 @@ class Database:
             return result.fetchone()
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
     
 
     def remove_user(self, user_id):
@@ -96,7 +96,7 @@ class Database:
             trans.commit()
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
 
 
     '''Session related queries'''
@@ -110,7 +110,7 @@ class Database:
             trans.commit()
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
 
 
     def get_sessions(self, user_id):
@@ -124,7 +124,7 @@ class Database:
             return sessions
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
     
 
     def get_session_title(self, session_id):
@@ -138,7 +138,7 @@ class Database:
             return title[0]
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
 
 
     def delete_session(self, session_id):
@@ -152,7 +152,7 @@ class Database:
             trans.commit()
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
 
 
     '''Chat related queries'''
@@ -166,7 +166,7 @@ class Database:
             trans.commit()
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
 
 
     def select_chats(self, session_id):
@@ -185,7 +185,7 @@ class Database:
             return conversation_list
         except Exception as e:
             trans.rollback()
-            print(f"Transaction failed: {e}")
+            raise e
 
 
 if __name__ == '__main__':
