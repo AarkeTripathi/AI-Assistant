@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import uuid
 
-ACCESS_TOKEN_EXPIRES_MINUTES = 30
+ACCESS_TOKEN_EXPIRES_MINUTES = 1
 REFRESH_TOKEN_EXPIRES_MINUTES = 2880    #2days
 MAX_FILE_SIZE = 5242880   #5MB
 ROLE1 = 'User'
