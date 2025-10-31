@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import pickle
 from redis.asyncio import Redis
 
+
 class Cache:
     def __init__(self):
         load_dotenv()
@@ -19,9 +20,9 @@ class Cache:
         serialized_data = await self.client.get(session_id)
         chat_history = pickle.loads(serialized_data)
         return chat_history
-        
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import asyncio
     import uuid
     from models.base_model import chat, create_chat_history
@@ -33,7 +34,7 @@ if __name__ == '__main__':
         await r.store_chat_history(session_id, chat_history)
         while True:
             chat_history = await r.get_chat_history(session_id)
-            text = input('User: ')
+            text = input("User: ")
             chat_history, response = chat(chat_history, text)
             await r.store_chat_history(session_id, chat_history)
             print(f"\nAI: {response}\n")
