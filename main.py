@@ -253,6 +253,7 @@ async def image_processing(session_id: str,
 
 
 if __name__=="__main__":
+    db.create_tables()
     port = int(os.getenv("PORT", 8000))
     # uvicorn.run("main:app", host="localhost", port=port, reload=True)   #For development
     uvicorn.run("main:app", host="0.0.0.0", port=port)   #For production
